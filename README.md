@@ -86,7 +86,7 @@ bash zsh-global-config.sh install
 Or run directly from GitHub:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/reck98/zsh-config-files/main/zsh-global-config.sh | bash -s install
+curl -fsSL https://raw.githubusercontent.com/reck98/zsh-config-file/main/zsh-global-config.sh | bash -s install
 ```
 
 After installation, switch your shell manually:
@@ -110,7 +110,7 @@ bash zsh-global-config.sh uninstall
 Or run directly from GitHub:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/reck98/zsh-config-files/main/zsh-global-config.sh | bash -s uninstall
+curl -fsSL https://raw.githubusercontent.com/reck98/zsh-config-file/main/zsh-global-config.sh | bash -s uninstall
 ```
 
 After uninstalling, **log out and log back in** to ensure a clean Bash session.
