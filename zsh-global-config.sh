@@ -2,24 +2,17 @@
 set -e
 
 MODE=${1:-install}
-
 echo "🔧 Mode: $MODE"
 
 # ------------------------------
 # Detect package manager
 # ------------------------------
 if command -v apt >/dev/null 2>&1; then
-  PM_UPDATE="sudo apt update"
-  PM_INSTALL="sudo apt install -y"
-  PM_REMOVE="sudo apt remove --purge -y"
+  PM="apt"
 elif command -v dnf >/dev/null 2>&1; then
-  PM_UPDATE="sudo dnf makecache"
-  PM_INSTALL="sudo dnf install -y"
-  PM_REMOVE="sudo dnf remove -y"
+  PM="dnf"
 elif command -v pacman >/dev/null 2>&1; then
-  PM_UPDATE="sudo pacman -Sy"
-  PM_INSTALL="sudo pacman -Sy --noconfirm"
-  PM_REMOVE="sudo pacman -Rns --noconfirm"
+  PM="pacman"
 else
   echo "❌ Unsupported package manager"
   exit 1
@@ -30,25 +23,37 @@ fi
 # ------------------------------
 if [ "$MODE" = "install" ]; then
   echo "📦 Installing base packages..."
-  $PM_UPDATE
-  $PM_INSTALL zsh git curl util-linux-user || true
 
-  # HARD CHECK — this is the key fix
+  if [ "$PM" = "apt" ]; then
+    sudo apt update
+    sudo apt install -y zsh git curl
+  elif [ "$PM" = "dnf" ]; then
+    sudo dnf makecache
+    sudo dnf install -y zsh git curl util-linux-user
+  elif [ "$PM" = "pacman" ]; then
+    sudo pacman -Sy --noconfirm zsh git curl
+  fi
+
+  # Verify zsh exists
   if ! command -v zsh >/dev/null 2>&1; then
-    echo "❌ zsh installation failed or not in PATH"
+    echo "❌ zsh installation failed"
     exit 1
   fi
 
-  echo "✔ zsh installed at $(which zsh)"
+  echo "✔ zsh found at $(which zsh)"
 
-  # Install Oh My Zsh WITHOUT shell switching
+  # ------------------------------
+  # Install Oh My Zsh safely
+  # ------------------------------
   if [ ! -d "$HOME/.oh-my-zsh" ]; then
-    echo "✨ Installing Oh My Zsh (no shell switch)..."
+    echo "✨ Installing Oh My Zsh..."
     RUNZSH=no CHSH=no \
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+      sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
   fi
 
-  # Plugins
+  # ------------------------------
+  # Install plugins
+  # ------------------------------
   ZSH_CUSTOM=${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}
 
   [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && \
@@ -59,24 +64,35 @@ if [ "$MODE" = "install" ]; then
     git clone https://github.com/zsh-users/zsh-syntax-highlighting \
     "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
 
-  # Clean old config
+  # ------------------------------
+  # Clean old config block
+  # ------------------------------
   sed -i '/# >>> ZSH_CUSTOM_START >>>/,/# <<< ZSH_CUSTOM_END <<</d' ~/.zshrc 2>/dev/null || true
 
+  # ------------------------------
   # Write config
+  # ------------------------------
   cat << 'EOF' >> ~/.zshrc
 
 # >>> ZSH_CUSTOM_START >>>
 
+# ---- History ----
 HISTFILE=~/.zsh_history
 HISTSIZE=10000
 SAVEHIST=10000
-setopt APPEND_HISTORY SHARE_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS
+setopt APPEND_HISTORY
+setopt SHARE_HISTORY
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_REDUCE_BLANKS
 
+# ---- Autosuggestions ----
 ZSH_AUTOSUGGEST_STRATEGY=(history)
 
+# ---- Prompt ----
 PROMPT='%F{green}%n@%m%f %F{cyan}%3~%f
 ➜ '
 
+# ---- Blank line spacing ----
 precmd() {
   print ""
 }
@@ -87,13 +103,16 @@ EOF
   # Enable plugins
   sed -i 's/^plugins=.*/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
 
-  # Switch shell LAST (safe)
+  # ------------------------------
+  # Switch shell LAST
+  # ------------------------------
   if [ "$SHELL" != "$(which zsh)" ]; then
     echo "🔁 Setting zsh as default shell"
     chsh -s "$(which zsh)"
   fi
 
-  echo "✅ Install complete. Logout & reopen terminal."
+  echo "✅ Zsh installation complete."
+  echo "➡️  Logout & open a new terminal."
   exit 0
 fi
 
@@ -103,18 +122,25 @@ fi
 if [ "$MODE" = "uninstall" ]; then
   echo "🧼 Reverting to bash..."
 
-  chsh -s "$(which bash)" || true
+  command -v bash >/dev/null 2>&1 && chsh -s "$(which bash)" || true
 
   rm -rf ~/.oh-my-zsh
   rm -f ~/.zshrc ~/.zprofile ~/.zshenv ~/.zlogin
 
   if command -v zsh >/dev/null 2>&1; then
-    $PM_REMOVE zsh || true
+    if [ "$PM" = "apt" ]; then
+      sudo apt remove --purge -y zsh
+    elif [ "$PM" = "dnf" ]; then
+      sudo dnf remove -y zsh
+    elif [ "$PM" = "pacman" ]; then
+      sudo pacman -Rns --noconfirm zsh
+    fi
   fi
 
-  echo "✅ Uninstall complete. Logout & reopen terminal."
+  echo "✅ Zsh removed. Logout & reopen terminal."
   exit 0
 fi
 
-echo "❌ Unknown mode"
+echo "❌ Unknown mode: $MODE"
+echo "Usage: bash zsh-global-config.sh install | uninstall"
 exit 1
