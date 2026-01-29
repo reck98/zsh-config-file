@@ -175,12 +175,21 @@ echo ""
 echo "✅ Zsh setup complete."
 pause 1
 echo ""
-echo "🔧 To make zsh your default shell, run:"
+echo "🔧 To make zsh your default shell:"
+pause 1
 echo ""
-echo "    chsh -s $(which zsh)"
+echo "   👉 Replace <username> with your Linux username"
 echo ""
-pause 3
+echo "       chsh -s $(which zsh) <username>"
+echo ""
+pause 2
+echo "   💡 Example for you:"
+echo ""
+echo "       chsh -s $(which zsh) $USER"
+echo ""
+pause 2
 echo "➡️  Then logout and login again."
 echo ""
-echo "ℹ️  Shell switching is manual for PAM / SSH safety."
+echo "ℹ️  This step is manual to avoid PAM / SSH issues."
 pause 2
+
