@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
 set -e
 
+# --------------------------------------------------
+# TTY-aware pause (Option 3)
+# --------------------------------------------------
+pause() {
+  local seconds=${1:-2}
+  if [ -t 1 ]; then
+    sleep "$seconds"
+  fi
+}
+
 echo "🚀 Starting global zsh setup"
+pause 2
 
 # --------------------------------------------------
 # Detect package manager
@@ -17,35 +28,36 @@ elif command -v pacman >/dev/null 2>&1; then
 fi
 
 echo "📦 Package manager detected: $PM"
+pause 1
 
 # --------------------------------------------------
-# Handle unsupported package managers
+# Handle unsupported distros
 # --------------------------------------------------
 if [ "$PM" = "unknown" ]; then
   echo ""
   echo "⚠️  Unsupported or unknown Linux distribution."
   echo ""
-  echo "This script supports:"
-  echo "  - Ubuntu / Debian (apt)"
-  echo "  - Fedora / RHEL (dnf)"
-  echo "  - Arch / Manjaro (pacman)"
+  echo "Supported:"
+  echo "  • Ubuntu / Debian (apt)"
+  echo "  • Fedora / RHEL (dnf)"
+  echo "  • Arch / Manjaro (pacman)"
   echo ""
-  echo "Please install the following packages manually:"
-  echo ""
-  echo "  zsh"
-  echo "  git"
-  echo "  curl"
+  echo "Please install manually:"
+  echo "  zsh git curl"
   echo ""
   echo "Then re-run this script."
   echo ""
   exit 1
 fi
 
+pause 2
+
 # --------------------------------------------------
-# Disable needrestart prompts (Ubuntu / Debian only)
+# Disable needrestart prompts (apt only)
 # --------------------------------------------------
 if [ "$PM" = "apt" ]; then
   echo "🔕 Disabling needrestart interactive prompts"
+  pause 1
   sudo mkdir -p /etc/needrestart
   sudo tee /etc/needrestart/needrestart.conf >/dev/null << 'EOF'
 $nrconf{restart} = 'a';
@@ -55,7 +67,8 @@ fi
 # --------------------------------------------------
 # Install base packages
 # --------------------------------------------------
-echo "📦 Installing base packages..."
+echo "📦 Installing base packages"
+pause 1
 
 if [ "$PM" = "apt" ]; then
   sudo apt update
@@ -68,32 +81,39 @@ elif [ "$PM" = "pacman" ]; then
 fi
 
 # --------------------------------------------------
-# Verify zsh installation
+# Verify zsh
 # --------------------------------------------------
 if ! command -v zsh >/dev/null 2>&1; then
   echo ""
-  echo "❌ zsh installation failed or zsh not in PATH."
-  echo "Please install zsh manually and re-run the script."
+  echo "❌ zsh installation failed."
+  echo "Please install zsh manually and re-run."
   echo ""
   exit 1
 fi
 
 echo "✅ zsh installed at $(which zsh)"
+pause 1
 
 # --------------------------------------------------
 # Install Oh My Zsh (NO shell switching)
 # --------------------------------------------------
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
   echo "✨ Installing Oh My Zsh"
+  pause 1
   RUNZSH=no CHSH=no \
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 else
   echo "✔ Oh My Zsh already installed"
 fi
 
+pause 1
+
 # --------------------------------------------------
-# Install plugins safely
+# Install plugins
 # --------------------------------------------------
+echo "🔌 Installing zsh plugins"
+pause 1
+
 ZSH_CUSTOM=${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}
 
 [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && \
@@ -110,8 +130,11 @@ ZSH_CUSTOM=${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}
 sed -i '/# >>> ZSH_CUSTOM_START >>>/,/# <<< ZSH_CUSTOM_END <<</d' ~/.zshrc 2>/dev/null || true
 
 # --------------------------------------------------
-# Write final zsh config
+# Write zsh configuration
 # --------------------------------------------------
+echo "📝 Writing zsh configuration"
+pause 1
+
 cat << 'EOF' >> ~/.zshrc
 
 # >>> ZSH_CUSTOM_START >>>
@@ -150,11 +173,14 @@ sed -i 's/^plugins=.*/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/
 # --------------------------------------------------
 echo ""
 echo "✅ Zsh setup complete."
+pause 1
 echo ""
-echo "🔧 To make zsh your default shell, run manually:"
+echo "🔧 To make zsh your default shell, run:"
 echo ""
 echo "    chsh -s $(which zsh)"
 echo ""
+pause 3
 echo "➡️  Then logout and login again."
 echo ""
-echo "ℹ️  Shell switching is manual to avoid PAM / SSH issues."
+echo "ℹ️  Shell switching is manual for PAM / SSH safety."
+pause 2
