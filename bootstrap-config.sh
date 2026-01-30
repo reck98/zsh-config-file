@@ -5,8 +5,8 @@ set -o pipefail
 # ==============================================================================
 # VM BOOTSTRAP SCRIPT (PIPE-SAFE VERSION)
 # ==============================================================================
-# This script is wrapped in a main() function to prevent 'curl: (23) Failed writing body'
-# errors when running via pipe (e.g., curl | bash -s status).
+# WRAPPED IN main() TO PREVENT CURL ERROR 23
+# This ensures the entire file is read before execution begins.
 
 main() {
     # Default Configuration
@@ -29,14 +29,8 @@ main() {
     done
 
     # --- Logging Setup ---
-    # We use a subshell for tee to avoid messing with the main script's pipes
-    if [[ ! -t 1 ]]; then
-        # If running non-interactively, just log to file if possible, or standard outputs
-        exec > >(tee -a "$LOG_FILE") 2>&1
-    else
-        # If interactive, standard behavior
-        exec > >(tee -a "$LOG_FILE") 2>&1
-    fi
+    # Log to file, but keep stdout visible
+    exec > >(tee -a "$LOG_FILE") 2>&1
 
     # --- Colors ---
     local BOLD="\033[1m"
@@ -91,18 +85,17 @@ main() {
     
     local SUDO_PID=""
 
-    # We cannot use 'trap' effectively inside a function for global cleanup in the same way,
-    # so we handle cleanup manually or via a separate trap set before calling main.
-    # However, for simplicity in a function wrapper, we will manage sudo explicitly.
-
+    # Start Sudo Keep-Alive (ONLY for install/uninstall)
     if [[ "$MODE" != "status" ]]; then
         sudo -v
         ( while true; do sudo -v; sleep 50; done; ) &
         SUDO_PID=$!
+        
+        # We need a manual trap here since we are inside a function
         trap 'kill $SUDO_PID 2>/dev/null || true' EXIT
         
+        # Clean leftover locks (apt specific)
         if [[ "$PM" == "apt" && -f /usr/sbin/policy-rc.d ]]; then
-            # Quietly clean leftover locks
             sudo rm -f /usr/sbin/policy-rc.d 2>/dev/null || true
         fi
     fi
@@ -116,7 +109,7 @@ main() {
 
       check_bin() {
         if command -v "$1" >/dev/null; then
-          # Added '|| true' to prevent pipefail crash if 'head' closes pipe early
+          # "|| true" prevents pipefail crash if 'head' closes pipe early
           local VER=$($1 --version 2>&1 | head -n1 || true)
           echo "  [OK] $1 $VER"
         else
@@ -145,7 +138,6 @@ main() {
       check_service docker
       check_service nginx
       
-      # Exit cleanly
       return 0
     fi
 
@@ -188,7 +180,7 @@ main() {
       echo "exit 101" | sudo tee /usr/sbin/policy-rc.d >/dev/null
       sudo chmod +x /usr/sbin/policy-rc.d
       
-      # Ensure cleanup happens if script exits here
+      # Update trap to include cleanup
       trap 'kill $SUDO_PID 2>/dev/null; sudo rm -f /usr/sbin/policy-rc.d 2>/dev/null' EXIT
     fi
 
@@ -304,6 +296,6 @@ main() {
     success "VM bootstrap finished cleanly"
 }
 
-# Invoke main with all arguments
-# This ensures the entire file is downloaded/parsed before execution begins
+# CALL MAIN AT THE END
+# This ensures the entire file is downloaded before execution
 main "$@"
