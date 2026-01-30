@@ -9,9 +9,9 @@ MODE="${1:-install}"
 if [[ "$MODE" != "install" && "$MODE" != "uninstall" && "$MODE" != "status" ]]; then
   echo "Invalid mode: $MODE"
   echo "Usage:"
-  echo "  vm-bootstrap.sh install"
-  echo "  vm-bootstrap.sh uninstall"
-  echo "  vm-bootstrap.sh status"
+  echo "  bootstrap-config.sh install"
+  echo "  bootstrap-config.sh uninstall"
+  echo "  bootstrap-config.sh status"
   exit 1
 fi
 
@@ -30,7 +30,7 @@ if ! command -v sudo >/dev/null 2>&1; then
 fi
 
 ############################################
-# TTY-aware pause (UX friendly, automation safe)
+# UX pause (TTY-aware)
 ############################################
 pause() {
   [[ -t 1 ]] && sleep "${1:-1}"
@@ -58,7 +58,7 @@ echo "Package manager detected: $PM"
 pause
 
 ############################################
-# Helper install functions
+# Helper functions
 ############################################
 install_pkgs() {
   case "$PM" in
@@ -99,6 +99,15 @@ if [[ "$MODE" == "status" ]]; then
   command -v node >/dev/null && node -v || echo "Node.js: not installed"
   command -v pm2 >/dev/null && pm2 -v || echo "PM2: not installed"
   command -v docker >/dev/null && docker --version || echo "Docker: not installed"
+
+  if command -v docker-compose >/dev/null; then
+    docker-compose --version
+  elif docker compose version >/dev/null 2>&1; then
+    docker compose version
+  else
+    echo "Docker Compose: not installed"
+  fi
+
   command -v cloudflared >/dev/null && cloudflared --version || echo "Cloudflared: not installed"
   command -v python3 >/dev/null && python3 --version || echo "Python: not installed"
   command -v gcc >/dev/null && gcc --version | head -n1 || echo "GCC: not installed"
@@ -114,7 +123,7 @@ if [[ "$MODE" == "install" ]]; then
   echo "Starting VM bootstrap install"
   pause 2
 
-  echo "Installing core system tools"
+  echo "Installing core system & build tools"
   install_pkgs curl wget git ca-certificates gnupg unzip zip tar \
                gcc g++ make pkg-config \
                iproute2 net-tools lsof htop rsync cron logrotate
@@ -141,12 +150,27 @@ if [[ "$MODE" == "install" ]]; then
   echo "Installing Docker (not started)"
   if ! command -v docker >/dev/null 2>&1; then
     if [[ "$PM" == "apt" ]]; then
-      sudo apt install -y docker.io docker-compose-plugin
+      sudo apt install -y docker.io
     elif [[ "$PM" == "dnf" ]]; then
-      sudo dnf install -y docker docker-compose-plugin
+      sudo dnf install -y docker
     elif [[ "$PM" == "pacman" ]]; then
-      sudo pacman -Sy --noconfirm docker docker-compose
+      sudo pacman -Sy --noconfirm docker
     fi
+  fi
+
+  echo "Installing Docker Compose (best available option)"
+  if [[ "$PM" == "apt" ]]; then
+    if apt-cache show docker-compose-plugin >/dev/null 2>&1; then
+      sudo apt install -y docker-compose-plugin
+    elif apt-cache show docker-compose >/dev/null 2>&1; then
+      sudo apt install -y docker-compose
+    else
+      echo "Docker Compose not available via apt, skipping"
+    fi
+  elif [[ "$PM" == "dnf" ]]; then
+    sudo dnf install -y docker-compose || true
+  elif [[ "$PM" == "pacman" ]]; then
+    sudo pacman -Sy --noconfirm docker-compose || true
   fi
 
   echo "Adding user to docker group"
@@ -183,8 +207,9 @@ if [[ "$MODE" == "install" ]]; then
   echo ""
   echo "Important notes:"
   echo "- Docker is installed but NOT started."
+  echo "- Docker Compose installed if available."
   echo "- Cloudflared is installed but NOT configured."
-  echo "- You must log out and log in again for docker group changes to apply."
+  echo "- Log out and log back in for docker group changes to apply."
   echo ""
   pause 2
   exit 0
@@ -203,7 +228,7 @@ if [[ "$MODE" == "uninstall" ]]; then
   echo "Removing Node.js"
   remove_pkgs nodejs npm || true
 
-  echo "Removing Docker"
+  echo "Removing Docker & Compose"
   remove_pkgs docker docker.io docker-compose docker-compose-plugin || true
 
   echo "Removing Nginx"
@@ -217,7 +242,7 @@ if [[ "$MODE" == "uninstall" ]]; then
 
   echo ""
   echo "Uninstall completed."
-  echo "Log out and log back in to ensure clean environment."
+  echo "Log out and log back in to ensure a clean environment."
   pause 2
   exit 0
 fi
